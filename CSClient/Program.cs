@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace CSClient
 {
@@ -9,26 +10,93 @@ namespace CSClient
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("[Client] Start.");
+            _sendBuff = Encoding.Default.GetBytes(_sendStr);
+            Connection();
 
-            var sendSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            sendSock.Connect("127.0.0.1", 8888);
-            Console.WriteLine("[Client] Connect To Server");
+            var update = new Thread(Update);
+            update.Start();
 
-            var sendStr = "OMG";
-            var sendBuff = Encoding.Default.GetBytes(sendStr);
-            sendSock.Send(sendBuff);
-            Console.WriteLine("[Client] Send To Server: " + sendStr);
+            while(true){}
+        }
 
-            var receiveBuff = new byte[1024];
-            var readCount = sendSock.Receive(receiveBuff);
-            var receiveStr = Encoding.Default.GetString(receiveBuff, 0, readCount);
-            Console.WriteLine("[Client] Receive from Server: " + receiveStr);
+        private static Socket _clientSock = null;
+        private static string _sendStr = "OMG";
+        private static byte[] _sendBuff = null;
 
-            sendSock.Close();
-            Console.WriteLine("[Client] Close!");
+        private static string _receiveStr = null;
+        private static byte[] _receiveBuff = null;
 
-            //Console.ReadLine();
+        private static void Connection()
+        {
+            _clientSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _clientSock.BeginConnect("127.0.0.1", 8888, ConnectionCallback, _clientSock);
+        }
+
+        private static void ConnectionCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var sock = (Socket)ar.AsyncState;
+                if (sock.Connected)
+                {
+                    Console.WriteLine("[Client] Connect To Server Successfully!");
+                    sock.EndConnect(ar);
+                    sock.BeginSend(_sendBuff, 0, _sendBuff.Length, 0, SendCallback, sock);
+                    _receiveBuff = new byte[1024];
+                    sock.BeginReceive(_receiveBuff, 0, _receiveBuff.Length, 0, ReceiveCallback, sock);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[Client] Connect Exception: " + e.ToString());
+            }
+        }
+
+        private static void SendCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var sock = (Socket)ar.AsyncState;
+                var sendCount = sock.EndSend(ar);
+                Console.WriteLine("[Client] Send Count: " + sendCount.ToString());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[Client] Send Exception: " + e.ToString());
+            }
+        }
+
+        private static void ReceiveCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var sock = (Socket)ar.AsyncState;
+                var receiveCount = sock.EndReceive(ar);
+                Console.WriteLine("[Client] Receive Count: " + receiveCount.ToString());
+                _receiveStr = null;
+                _receiveStr = Encoding.Default.GetString(_receiveBuff, 0, receiveCount);
+                _receiveBuff = new byte[1024];
+                sock.BeginReceive(_receiveBuff, 0, _receiveBuff.Length, 0, ReceiveCallback, sock);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[Client] Receive Exception: " + e.ToString());
+            }
+        }
+
+        private static void Update()
+        {
+            while (true)
+            {
+                Thread.Sleep(300);
+                if (!string.IsNullOrEmpty(_receiveStr))
+                {
+                    Console.WriteLine("[Client] Receive: " + _receiveStr);
+                    _receiveStr = null;
+                }
+            }
+            
         }
     }
 }
