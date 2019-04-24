@@ -25,7 +25,7 @@ namespace CSClient
         private static byte[] _sendBuff = null;
 
         private static string _receiveStr = null;
-        private static byte[] _receiveBuff = null;
+        private static byte[] _receiveBuff = new byte[1024];
 
         private static void Connection()
         {
@@ -43,7 +43,6 @@ namespace CSClient
                     Console.WriteLine("[Client] Connect To Server Successfully!");
                     sock.EndConnect(ar);
                     sock.BeginSend(_sendBuff, 0, _sendBuff.Length, 0, SendCallback, sock);
-                    _receiveBuff = new byte[1024];
                     sock.BeginReceive(_receiveBuff, 0, _receiveBuff.Length, 0, ReceiveCallback, sock);
                 }
             }
@@ -76,7 +75,11 @@ namespace CSClient
                 Console.WriteLine("[Client] Receive Count: " + receiveCount.ToString());
                 _receiveStr = null;
                 _receiveStr = Encoding.Default.GetString(_receiveBuff, 0, receiveCount);
-                _receiveBuff = new byte[1024];
+                if (receiveCount == 3)
+                {
+                    var close = new byte[1];
+                    sock.BeginSend(close, 0, close.Length, 0, SendCallback, sock);
+                }
                 sock.BeginReceive(_receiveBuff, 0, _receiveBuff.Length, 0, ReceiveCallback, sock);
             }
             catch (Exception e)
